@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Paper, TableContainer, TableHead, TableBody, 
   TableFooter, Table, TableCell, TableRow, 
-  TableSortLabel, TablePagination } from '@mui/material';
+  TableSortLabel, TablePagination, InputLabel, TextField, Select,FormHelperText, FormLabel, MenuItem, Button } from '@mui/material';
 import axios from 'axios';
 import './App.css';
 
 function App() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+
   const [fetchedApiPages, setFetchedApiPages] = useState([]); // Array to keep track of fetched API pages
   const [currentPage, setCurrentPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -34,27 +38,43 @@ function App() {
 
 
   const fetchPages = async (startPage, endPage) => {
+    setLoading(true);
     let data = [];
     let fetchedPages = [...fetchedApiPages]; // Create a copy of fetchedApiPages to avoid modifying state directly
     for (let page = startPage; page <= endPage; page++) {
-      if (!fetchedApiPages.includes(page)) {
+      if (!fetchedPages.includes(page)) {
         try {
           const response = await axios.get(`https://rickandmortyapi.com/api/character/?page=${page}`); //20 characters per page
           data = [...data, ...response.data.results];
           fetchedPages.push(page); // Add the page to fetchedApiPages
+          // If there's no 'next' page in the API response, stop fetching
+          if (!response.data.info.next) {
+            break;
+          }
         } catch (error) {
           console.error('Error fetching page', page, error);
+          if (error.response && error.response.status === 404) {
+            setError("No characters found. The API might have run out of data or your request is invalid.");
+          } else {
+            setError("Failed to fetch data. Please check your network connection.");
+          }
         }
-      }
-      
+      } 
     }
     setRowsData(prevRows => [...prevRows, ...data]); // Append new data to existing rowsData
     setFetchedApiPages(fetchedPages); // Update the state with fetched pages
+    setLoading(false); // Ensure loading is set to false after fetching
   }
 
   useEffect(() => {
     fetchPages(1, 13); // Fetch the first 13 or 260 characters at least on first render
   }, []);
+
+  // Reset currentPage when filterType or filterValue changes
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [filterType, filterValue]);
+
 
   // Function to handle sorting
   const handleSort = (column) => {
@@ -69,33 +89,37 @@ function App() {
 
   // Sort the rowsData based on the selected column and direction
   const sortedRowsData = [...rowsData].sort((a, b) => {
+    let aValue = a[sortBy];
+    let bValue = b[sortBy];
+    // Handle special cases for origin and location since they are objects
+    if (typeof aValue === 'object' && aValue !== null) aValue = aValue.name;
+    if (typeof bValue === 'object' && bValue !== null) bValue = bValue.name;
     if (sortDirection === 'asc') {
-      return a[sortBy] > b[sortBy] ? 1 : -1;
+      return aValue > bValue ? 1 : -1;
     } else {
-      return a[sortBy] < b[sortBy] ? 1 : -1;
+      return aValue < bValue ? 1 : -1;
     }
   });
 
   // Filter the sorted rowsData based on the filterType and filterValue
-  const filteredRowsData = sortedRowsData.filter(row => {
-    if (!filterType || !filterValue) {
-      return true; // <-- include all rows if no filter is set
+  const filteredRowsData = [...sortedRowsData].filter(row => {
+    if(!filterType || !filterValue) {
+      return true;
     }
-    let value = row[filterType];
-    if (typeof value === 'object' && value !== null && value.name) {
-      value = value.name;
-    }
+    const value = row[filterType];
     if (typeof value === 'string') {
-      return value.toLowerCase().includes(filterValue.trim().toLowerCase());
+      if (filterType === "gender" ) {
+        // Special exception for gender
+        // Can't use includes because "male" is a substring of "female"
+        // so we check if the first letter matches 
+        return value.toLowerCase()[0]===filterValue.toLowerCase()[0];
+      } 
+      return value.toLowerCase().includes(filterValue.toLowerCase());
+    } else if (typeof value === 'object' && value !== null) {
+      return value.name.toLowerCase().includes(filterValue.toLowerCase());
     }
     return false;
   });
-
-  
-
-
-
-
 
 
   return (
@@ -103,32 +127,43 @@ function App() {
       <Box sx={{ width: '100%' }}>
         <Paper elevation={4} sx={{ width: '100%'}} square={false}>
           <TableContainer sx={{ width: '80vw', overflowY: 'auto' }}>
-            <Table  >
+            <Table stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell colSpan={9} sx={{ textAlign: 'center', fontSize: '1.2rem', fontWeight: 'bold' }}>
+                  <TableCell colSpan={columnHeaders.length} sx={{ textAlign: 'center', fontSize: '1.2rem', fontWeight: 'bold' }}>
                     Rick and Morty Characters
                   </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell colSpan={9} sx={{ textAlign: 'right' }}  >
-                    <p >Filter By:</p>
-                    <select style={{ marginRight: '10px', background: 'white', color: 'black' }} 
-                    value={filterType} onChange={(e) => {setFilterType(e.target.value);}}>
-                      <option value="">All</option>
-                      <option value="name">Name</option>
-                      <option value="status">Status</option>
-                      <option value="species">Species</option>
-                      <option value="type">Type</option>
-                      <option value="gender">Gender</option>
-                      <option value="origin">Origin</option>
-                      <option value="location">Location</option>
-                    </select>
-                    <input style={{ marginRight: '10px', background: 'white', color: 'black' }} type="text" 
-                    placeholder="Search..." value={filterValue} onChange={(e) => {setFilterValue(e.target.value);}}/>
-                  </TableCell>
+                  <TableCell colSpan={columnHeaders.length}  sx={{ textAlign: 'center', fontSize: '0.9rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'end', alignItems: 'center' }}>
+                      <InputLabel htmlFor="filter-type-select">Filter By:</InputLabel>
+                      <Select
+                        label="Filter By"
+                        sx={{ minWidth: 100, marginRight: 2, marginLeft: 2 }}
+                        variant="standard"
+                        id='filter-type-select'
+                        value={filterType} 
+                        onChange={(e) => {setFilterType(e.target.value);}}
+                      >
+                        <MenuItem value=""><em>None</em></MenuItem>
+                        <MenuItem value="name">Name</MenuItem>
+                        <MenuItem value="status">Status</MenuItem>
+                        <MenuItem value="species">Species</MenuItem>
+                        <MenuItem value="type">Type</MenuItem>
+                        <MenuItem value="gender">Gender</MenuItem>
+                        <MenuItem value="origin">Origin</MenuItem>
+                        <MenuItem value="location">Location</MenuItem>
+                      </Select>
+                        <TextField sx={{ marginRight: 2 }} id="standard-basic" label="Search" variant="standard" value={filterValue} onChange={(e) => {setFilterValue(e.target.value);}}/>
+                        <Button variant="contained" onClick={() => {
+                          setFilterType('');
+                          setFilterValue('');
+                        }}>Clear Filters</Button>
+                    </div>
+                    </TableCell>  
                 </TableRow>
-                <TableRow>
+                <TableRow sx={{backgroundColor: '#f5f5f5'}}>
                   {columnHeaders.map(header => {
                     return(
                       <TableCell key={header.id}>
@@ -144,15 +179,28 @@ function App() {
                 </TableRow>
               </TableHead>
               <TableBody sx={{ overflow: 'scroll' }}>
-                {filteredRowsData < 1 ? (
+                {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} sx={{ textAlign: 'center' }}>
-                      <p>Sorry characters cannot be found 🥺</p>
+                    <TableCell colSpan={columnHeaders.length} sx={{ textAlign: 'center' }}>
+                      Loading characters...⏳
+                    </TableCell>
+                  </TableRow>
+                ) : error ? (
+                  <TableRow>
+                    <TableCell colSpan={columnHeaders.length} sx={{ textAlign: 'center', color: 'red' }}>
+                      Error: {error}
+                    </TableCell>
+                  </TableRow>
+                ) : filteredRowsData.length < 1 ? (
+                  <TableRow>
+                    <TableCell colSpan={columnHeaders.length} sx={{ textAlign: 'center' }}>
+                      <p>Sorry, no characters found matching your criteria 🥺</p>
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredRowsData.slice(currentPage * rowsPerPage, currentPage * rowsPerPage + rowsPerPage).map((row) => (
-                    <TableRow hover key={row.id} onClick={() => setActiveCharacter(activeCharacter?.id == row.id ? null : row)}>
+                    <TableRow sx={{cursor:'pointer', backgroundColor: activeCharacter?.id === row.id ? '#f5f5f5' : 'inherit'}} 
+                    hover key={row.id} onClick={() => setActiveCharacter(activeCharacter?.id == row.id ? null : row)}>
                       <TableCell>{row.id}</TableCell>
                       <TableCell>
                         <img src={row.image} alt={row.name} style={{ width: '80px', height: '80px' }} />
@@ -173,12 +221,11 @@ function App() {
                 <TableRow>
                   <TablePagination
                     rowsPerPageOptions={[5, 10, 20]}           
-                    count={825}
+                    count={filteredRowsData.length}
                     rowsPerPage={rowsPerPage}
                     page={currentPage}
                     onPageChange={(event, newPage) => {
                       setCurrentPage(newPage);
-                      // Calculate which API page is needed for the new table page
                       const apiPageNeeded = Math.floor((newPage * rowsPerPage) / 20) + 1;
                       if (!fetchedApiPages.includes(apiPageNeeded)) {
                         fetchPages(apiPageNeeded, apiPageNeeded);
@@ -196,7 +243,6 @@ function App() {
             </Table>
           </TableContainer>
         </Paper>
-        
       </Box>
 
       {activeCharacter && (
@@ -217,16 +263,19 @@ function App() {
                 <p><strong>Gender:</strong> {activeCharacter.gender}</p>
                 <p><strong>Origin:</strong> {activeCharacter.origin.name}</p>
                 <p><strong>Location:</strong> {activeCharacter.location.name}</p>
-                <p><strong>Url:</strong> {activeCharacter.url}</p>
-                <p><strong>Created:</strong> {activeCharacter.created}</p>
+                
+                {activeCharacter.episode && activeCharacter.episode.length > 0 && (
+                  <p>
+                    <strong>Episodes:</strong> {activeCharacter.episode.length}
+                  </p>
+                )}
+                <p><strong>URL:</strong> <a href={activeCharacter.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{activeCharacter.url}</a></p>
+                <p><strong>Created:</strong> {new Date(activeCharacter.created).toLocaleDateString()}</p>
               </div>
             </div>
-
           </Paper>
         </Box>
       )}
-
-      
     </>
   )
 }
