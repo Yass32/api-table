@@ -61,7 +61,7 @@ src/
   index.css       # Global styles
   assets/         # Static assets
 public/
-  vite.svg        # Favicon
+  icon.png        # Favicon
 ```
 
 ## Tech Stack
