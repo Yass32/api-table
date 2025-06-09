@@ -74,7 +74,8 @@ function App() {
     // Update state with new data and fetched pages
     setRowsData(prevRows => [...prevRows, ...data]);
     setFetchedApiPages(fetchedPages);
-    setLoading(false); // Hide loading spinner
+    setLoading(false); // Hide loading message
+    setError(null); // Clear any previous errors
   }
 
   // On first render, fetch the first 13 pages (about 260 characters)
@@ -137,7 +138,7 @@ function App() {
   return (
     <>
       {/* Main container */}
-      <Box sx={{ width: '100%' }}>
+      <Box sx={{ width: '80vw'}}>
         <Paper elevation={4} sx={{ width: '100%'}} square={false}>
           {/* Table container with scroll and fixed height for sticky header */}
           <TableContainer sx={{ width: '80vw', maxHeight: '80vh', overflowY: 'auto' }}>
@@ -275,14 +276,14 @@ function App() {
 
       {/* Character details modal */}
       {activeCharacter && (
-        <Box sx={{ position: 'relative', top: 0, left: 0, width: '100%', height: '70%', backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: 5 }}>
-          <Paper elevation={4} sx={{ padding: 2, width: '80vw', maxHeight: '80vh', overflowY: 'auto' }}>
+        <Box sx={{ width: '80vw' }}>
+          <Paper elevation={4} sx={{ width: '100%', paddingTop: '20px', paddingBottom: '20px',  marginTop: '20px' }}>
             <h2>Character Details</h2>
-            <div style={{display: 'flex', alignItems: 'flex-start', justifyContent: 'center', textAlign: 'left'}}>
+            <div style={{display: 'flex', alignItems: 'flex-start', justifyContent: 'center', textAlign: 'left'}} className="character-details-flex">
               <div>
-                <img src={activeCharacter.image} alt={activeCharacter.name} style={{ width: '150px', height: '150px', borderRadius: '50%' }} />
+                <img src={activeCharacter.image} alt={activeCharacter.name} style={{ width: '150px', height: '150px', borderRadius: '50%' }}  />
               </div>
-              <div style={{ marginLeft: '20px', marginTop: '-20px' }}>
+              <div style={{ marginLeft: '25px', marginTop: '-20px' }}>
                 <p><strong>ID:</strong> {activeCharacter.id}</p>
                 <p><strong>Name:</strong> {activeCharacter.name}</p>
                 <p><strong>Status:</strong> {activeCharacter.status}</p>
